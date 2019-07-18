@@ -80,6 +80,10 @@ before do
 
 end
 
+after do
+  @storage.disconnect
+end
+
 get "/" do
   redirect "/lists"
 end
