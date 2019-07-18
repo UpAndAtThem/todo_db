@@ -1,4 +1,5 @@
 require 'pg'
+require 'pry'
 
 class DatabasePersistence
 
@@ -22,23 +23,42 @@ class DatabasePersistence
   end
 
   def all_lists
-    sql = "SELECT * FROM lists"
-    result = @db.exec(sql)
+    sql = <<~LISTS
+      SELECT l.*, COUNT(completed) AS "total_todos", COUNT(NULLIF(t.completed, true)) AS "incomplete_todos"
+      FROM lists l
+      LEFT JOIN todos t ON l.id = t.list_id
+      GROUP BY l.name, l.id;
+    LISTS
 
-    result.map do |tuple|
-      todos = find_todos tuple["id"]
+    result = query sql
 
-      {id: tuple["id"], name: tuple["name"], todos: todos}
+    x = result.map do |tuple|
+      list_id = tuple["id"].to_i
+
+      {id: list_id, 
+       name: tuple["name"], 
+       total_todos_count: tuple["total_todos"], 
+       incomplete_todos_count: tuple["incomplete_todos"]}
     end
   end
 
   def find_list(id)
-    list_sql = "SELECT * FROM lists WHERE lists.id = $1"
+    sql = <<~LISTS
+      SELECT l.*, COUNT(completed) AS "total_todos", COUNT(NULLIF(t.completed, true)) AS "incomplete_todos"
+      FROM lists l
+      LEFT JOIN todos t ON l.id = t.list_id
+      WHERE l.id = $1
+      GROUP BY l.name, l.id;
+    LISTS
 
-    list_res = query(list_sql, id).values.first
-    todos = find_todos id
+    total_and_completed = query sql, id
 
-    {id: list_res[0].to_i, name: list_res[1], todos: todos}
+    res = total_and_completed.map do |t| 
+      {id: t["id"], name: t["name"], total_todos_count: t["total_todos"],
+       incomplete_todos_count: t["incomplete_todos"]}
+    end.first
+
+    res
   end
 
   def create_list(list_name)

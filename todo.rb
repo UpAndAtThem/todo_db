@@ -22,16 +22,16 @@ helpers do
     todos_count(list) > 0 && todos_remaining_count(list) == 0
   end
 
-  def list_class(list)
-    "complete" if list_complete?(list)
-  end
-
   def todos_count(list)
-    list[:todos].length
+    list[:total_todos_count].to_i
   end
 
   def todos_remaining_count(list)
-    list[:todos].count { |todo| todo[:completed] == false }
+    list[:incomplete_todos_count].to_i
+  end
+
+  def list_class(list)
+    "complete" if list_complete?(list)
   end
 
   def sort_lists(lists, &block)
@@ -120,6 +120,7 @@ get "/lists/:id" do
   @list_id = params[:id].to_i
   @list = load_list(@list_id)
 
+  @todos = @storage.find_todos(@list_id)
   erb :list, layout: :layout
 end
 
@@ -196,9 +197,10 @@ end
 post "/lists/:list_id/todos/:id" do
   @list_id = params[:list_id].to_i
   @todo_id = params[:id].to_i
-  new_status = !@storage.find_list(@list_id)[:todos].find { |todo| todo[:id] == params[:id]}[:completed]
 
-  @storage.update_todo(@list_id, @todo_id, new_status)
+  @new_status = params[:completed] == 'true'
+
+  @storage.update_todo(@list_id, @todo_id, @new_status)
 
   session[:success] = "The todo has been updated."
   redirect "/lists/#{@list_id}"
